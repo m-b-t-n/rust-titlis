@@ -159,20 +159,3 @@ fn main() {
         }
     }
 }
-
-fn display_a_tetromino() {
-    let tetromino = Tetromino::rand();
-    for y in (-2..=2).rev() {
-        print!("| ");
-        for x in -2..2 {
-            let mut sq = " ";
-            for i in 0..4 {
-                if tetromino.shape()[i][0] == x && tetromino.shape()[i][1] == y {
-                    sq = "*";
-                };
-            }
-            print!("{}", sq);
-        }
-        println!(" |");
-    }
-}
