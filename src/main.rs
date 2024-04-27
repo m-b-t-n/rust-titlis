@@ -38,6 +38,80 @@ impl Tetromino {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+struct Block {
+    kind: Tetromino,
+    points: [[i32; 2]; 4],
+    x: i32,
+    y: i32,
+}
+
+impl Block {
+    fn new(x: i32, y: i32) -> Self {
+        let kind = Tetromino::rand();
+        Block {
+            kind,
+            points: kind.shape(),
+            x,
+            y: y - kind.shape().iter().max_by_key(|p| p[1]).unwrap()[1],
+        }
+    }
+
+    fn empty() -> Self {
+        let kind = Tetromino::X;
+        Block {
+            kind,
+            points: kind.shape(),
+            x: 0,
+            y: 0,
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.kind == Tetromino::X
+    }
+    fn point(&self, i: usize) -> (i32, i32) {
+        (self.x + self.points[i][0], self.y + self.points[i][1])
+    }
+    fn left(&self) -> Block {
+        Block {
+            x: self.x - 1,
+            ..*self
+        }
+    }
+    fn right(&self) -> Block {
+        Block {
+            x: self.x + 1,
+            ..*self
+        }
+    }
+    fn down(&self) -> Block {
+        Block {
+            y: self.y - 1,
+            ..*self
+        }
+    }
+    fn rotate_right(&self) -> Block {
+        self.rotate(true)
+    }
+    fn rotate_left(&self) -> Block {
+        self.rotate(false)
+    }
+    fn rotate(&self, clockwise: bool) -> Block {
+        let mut points: [[i32; 2]; 4] = [[0; 2]; 4];
+        for i in 0..4 {
+            points[i] = if clockwise {
+                // rotate_right
+                [self.points[i][1], -self.points[i][0]]
+            } else {
+                // rotate_left
+                [-self.points[i][1], self.points[i][0]]
+            };
+        }
+        Block { points, ..*self }
+    }
+}
+
 fn main() {
     display_a_tetromino()
 }
