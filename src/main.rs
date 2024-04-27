@@ -39,6 +39,10 @@ impl Tetromino {
 }
 
 fn main() {
+    display_a_tetromino()
+}
+
+fn display_a_tetromino() {
     let tetromino = Tetromino::rand();
     for y in (-2..=2).rev() {
         print!("| ");
