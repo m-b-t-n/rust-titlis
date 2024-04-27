@@ -1,5 +1,27 @@
 use std::io::Read;
 
+// A size of pixel when drawing into a display
+const UNIT_SIZE: i32 = 20;
+
+// Titlis board size
+const BOARD_WIDTH: i32 = 10;
+const BOARD_HEIGHT: i32 = 22;
+
+// Key definition
+enum Key {
+    LEFT,
+    RIGHT,
+    UP,
+    DOWN,
+    SP,
+    OTHER,
+}
+
+// Utility function that returns an index from (x, y) points
+fn index_at(x: i32, y: i32) -> usize {
+    (y * BOARD_WIDTH + x) as usize
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum Tetromino {
     I,
@@ -111,6 +133,130 @@ impl Block {
             };
         }
         Block { points, ..*self }
+    }
+}
+
+struct Game {
+    board: [Tetromino; (BOARD_WIDTH * BOARD_HEIGHT) as usize],
+    current: Block,
+    stopped: bool,
+    time: std::time::SystemTime,
+    score: u32,
+}
+
+impl Game {
+    fn new() -> Self {
+        Game {
+            board: [Tetromino::X; (BOARD_WIDTH * BOARD_HEIGHT) as usize],
+            current: Block::empty(),
+            stopped: false,
+            time: std::time::SystemTime::now(),
+            score: 0,
+        }
+    }
+
+    fn tick(&mut self) {
+        if self.current.is_empty() {
+            self.put_block();
+        } else if self.time.elapsed().unwrap()
+            > std::time::Duration::from_millis((1000 - self.score) as u64)
+        {
+            self.down();
+            self.time = std::time::SystemTime::now();
+        }
+    }
+
+    fn put_block(&mut self) {
+        self.stopped = !self.try_move(Block::new(BOARD_WIDTH / 2, BOARD_HEIGHT - 1));
+    }
+
+    fn try_move(&mut self, block: Block) -> bool {
+        for i in 0..4 {
+            let (x, y) = block.point(i);
+            if x < 0 || x >= BOARD_WIDTH || y < 0 || y >= BOARD_HEIGHT {
+                return false;
+            }
+            if self.board[index_at(x, y)] != Tetromino::X {
+                return false;
+            }
+        }
+        self.current = block;
+        true
+    }
+
+    fn down(&mut self) {
+        if !self.try_move(self.current.down()) {
+            self.block_dropped();
+        }
+    }
+
+    fn drop_down(&mut self) {
+        while self.current.y > 0 {
+            if !self.try_move(self.current.down()) {
+                break;
+            }
+        }
+        self.block_dropped();
+    }
+
+    fn block_dropped(&mut self) {
+        for i in 0..4 {
+            let (x, y) = self.current.point(i);
+            self.board[index_at(x, y)] = self.current.kind;
+        }
+        self.remove_complete_lines();
+        if self.current.is_empty() {
+            self.put_block();
+        }
+    }
+
+    fn key_pressed(&mut self, key: Key) {
+        if self.stopped || self.current.is_empty() {
+            return;
+        }
+        match key {
+            Key::LEFT => {
+                self.try_move(self.current.left());
+            }
+            Key::RIGHT => {
+                self.try_move(self.current.right());
+            }
+            Key::UP => {
+                self.try_move(self.current.rotate_right());
+            }
+            Key::DOWN => {
+                self.try_move(self.current.rotate_left());
+            }
+            Key::OTHER => {
+                self.down();
+            }
+            Key::SP => {
+                self.drop_down();
+            }
+        };
+    }
+
+    fn remove_complete_lines(&mut self) {
+        let mut line_count = 0;
+        for y in (0..BOARD_HEIGHT).rev() {
+            let mut complete = true;
+            for x in 0..BOARD_WIDTH {
+                if self.board[index_at(x, y)] == Tetromino::X {
+                    complete = false;
+                    break;
+                }
+            }
+            if complete {
+                line_count += 1;
+                for dy in y..BOARD_HEIGHT - 1 {
+                    for x in 0..BOARD_WIDTH {
+                        self.board[index_at(x, dy)] = self.board[index_at(x, dy + 1)];
+                    }
+                }
+            }
+            self.score += line_count * line_count;
+            self.current = Block::empty();
+        }
     }
 }
 
