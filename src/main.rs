@@ -1,3 +1,5 @@
+use std::io::Read;
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum Tetromino {
     I,
@@ -113,7 +115,49 @@ impl Block {
 }
 
 fn main() {
-    display_a_tetromino()
+    let mut block = Block::new(5, 4);
+    print(block);
+
+    loop {
+        let input = std::io::stdin()
+            .bytes()
+            .next()
+            .and_then(|result| result.ok())
+            .map(|byte| byte as char)
+            .unwrap();
+        match input {
+            'z' => {
+                block = block.left();
+            }
+            'c' => {
+                block = block.right();
+            }
+            'x' => {
+                block = block.rotate_left();
+            }
+            'q' => {
+                break;
+            }
+            _ => continue,
+        }
+        print(block);
+    }
+    fn print(block: Block) {
+        for y in (0..5).rev() {
+            print!("| ");
+            for x in 0..10 {
+                let mut sq = " ";
+                for i in 0..4 {
+                    let (px, py) = block.point(i);
+                    if px == x && py == y {
+                        sq = "*";
+                    };
+                }
+                print!("{}", sq);
+            }
+            println!(" |");
+        }
+    }
 }
 
 fn display_a_tetromino() {
