@@ -1,6 +1,7 @@
 use tiny_skia::{FillRule, Paint, PathBuilder, Pixmap, Rect, Transform};
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
+use winit::keyboard::{Key::Named, NamedKey};
 use winit::window::WindowBuilder;
 
 // A size of pixel when drawing into a display
@@ -61,6 +62,19 @@ impl Tetromino {
             Tetromino::S => [[0, -1], [0, 0], [-1, 0], [-1, 1]],
             Tetromino::Z => [[0, -1], [0, 0], [1, 0], [1, 1]],
             Tetromino::X => [[0; 2]; 4],
+        }
+    }
+
+    fn color(&self) -> (u8, u8, u8) {
+        match self {
+            Tetromino::I => (104, 102, 204),
+            Tetromino::O => (204, 102, 204),
+            Tetromino::T => (204, 204, 102),
+            Tetromino::J => (204, 204, 204),
+            Tetromino::L => (218, 170, 0),
+            Tetromino::S => (204, 102, 102),
+            Tetromino::Z => (102, 204, 102),
+            _ => (0, 0, 0),
         }
     }
 }
@@ -261,6 +275,42 @@ impl Game {
             self.current = Block::empty();
         }
     }
+
+    fn draw(&self, pixmap: &mut Pixmap) {
+        for y in 0..BOARD_HEIGHT {
+            for x in 0..BOARD_WIDTH {
+                Game::draw_square(pixmap, x, y, self.board[index_at(x, y)]);
+            }
+            for i in 0..4 {
+                let (x, y) = self.current.point(i);
+                Game::draw_square(pixmap, x, y, self.current.kind);
+            }
+        }
+    }
+
+    // Write a square into a pixel map
+    fn draw_square(pixmap: &mut Pixmap, x: i32, y: i32, kind: Tetromino) {
+        let x = x * UNIT_SIZE;
+        let y = (BOARD_HEIGHT - 1 - y) * UNIT_SIZE;
+        let rect = Rect::from_xywh(
+            (x + 1) as f32,
+            (y + 1) as f32,
+            (UNIT_SIZE - 2) as f32,
+            (UNIT_SIZE - 2) as f32,
+        )
+        .unwrap();
+        let path = PathBuilder::from_rect(rect);
+        let mut paint = Paint::default();
+        let (r, g, b) = kind.color();
+        paint.set_color_rgba8(r, g, b, 255);
+        pixmap.fill_path(
+            &path,
+            &paint,
+            FillRule::EvenOdd,
+            Transform::identity(),
+            None,
+        );
+    }
 }
 
 fn main() {
@@ -268,7 +318,11 @@ fn main() {
     event_loop.set_control_flow(ControlFlow::Poll);
 
     let window = WindowBuilder::new()
-        .with_inner_size(winit::dpi::LogicalSize::new(400, 200))
+        .with_inner_size(winit::dpi::LogicalSize::new(
+            BOARD_WIDTH * UNIT_SIZE,
+            BOARD_HEIGHT * UNIT_SIZE,
+        ))
+        .with_title("Titlis")
         .build(&event_loop)
         .unwrap();
 
@@ -277,13 +331,33 @@ fn main() {
     let context = softbuffer::Context::new(window.clone()).unwrap();
     let mut surface = softbuffer::Surface::new(&context, window.clone()).unwrap();
 
+    let mut game = Game::new();
+
     let _ = event_loop.run(move |event, elwt| match event {
         Event::WindowEvent {
             event: WindowEvent::CloseRequested,
             ..
         } => elwt.exit(),
-        Event::AboutToWait => {
+        Event::WindowEvent {
+            event: WindowEvent::KeyboardInput { event, .. },
+            ..
+        } if event.state.is_pressed() => {
+            match event.logical_key {
+                Named(NamedKey::ArrowRight) => game.key_pressed(Key::RIGHT),
+                Named(NamedKey::ArrowLeft) => game.key_pressed(Key::LEFT),
+                Named(NamedKey::ArrowDown) => game.key_pressed(Key::DOWN),
+                Named(NamedKey::ArrowUp) => game.key_pressed(Key::UP),
+                Named(NamedKey::Space) => game.key_pressed(Key::SP),
+                _ => game.key_pressed(Key::OTHER),
+            };
             window.request_redraw();
+        }
+        Event::AboutToWait => {
+            if !game.stopped {
+                game.tick();
+                window.set_title(format!("Titlis:{}", game.score).as_str());
+                window.request_redraw();
+            }
         }
         Event::WindowEvent {
             window_id,
@@ -305,7 +379,8 @@ fn main() {
 
             // Generate a pixel buffer to draw blocks
             let mut pixmap = Pixmap::new(width, height).unwrap();
-            draw_block(&mut pixmap);
+
+            game.draw(&mut pixmap);
 
             // Apply them to display buffer
             let mut buffer = surface.buffer_mut().unwrap();
@@ -318,19 +393,4 @@ fn main() {
         }
         _ => (),
     });
-}
-
-// Write a square into a pixel map
-fn draw_block(pixmap: &mut Pixmap) {
-    let rect = Rect::from_xywh(190.0, 90.0, 20.0, 20.0).unwrap();
-    let path = PathBuilder::from_rect(rect);
-    let mut paint = Paint::default();
-    paint.set_color_rgba8(104, 102, 204, 255);
-    pixmap.fill_path(
-        &path,
-        &paint,
-        FillRule::EvenOdd,
-        Transform::identity(),
-        None,
-    );
 }
