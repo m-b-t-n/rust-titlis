@@ -18,6 +18,7 @@ enum Key {
     UP,
     DOWN,
     SP,
+    ESC,
     OTHER,
 }
 
@@ -227,6 +228,14 @@ impl Game {
         }
     }
 
+    fn restart(&mut self) {
+        self.board = [Tetromino::X; (BOARD_WIDTH * BOARD_HEIGHT) as usize];
+        self.stopped = false;
+        self.score = 0;
+        self.current = Block::empty();
+        self.time = std::time::SystemTime::now();
+    }
+
     fn key_pressed(&mut self, key: Key) {
         if self.stopped || self.current.is_empty() {
             return;
@@ -243,6 +252,9 @@ impl Game {
             }
             Key::DOWN => {
                 self.try_move(self.current.rotate_left());
+            }
+            Key::ESC => {
+                self.restart();
             }
             Key::OTHER => {
                 self.down();
@@ -348,6 +360,7 @@ fn main() {
                 Named(NamedKey::ArrowDown) => game.key_pressed(Key::DOWN),
                 Named(NamedKey::ArrowUp) => game.key_pressed(Key::UP),
                 Named(NamedKey::Space) => game.key_pressed(Key::SP),
+                Named(NamedKey::Escape) => game.key_pressed(Key::ESC),
                 _ => game.key_pressed(Key::OTHER),
             };
             window.request_redraw();
