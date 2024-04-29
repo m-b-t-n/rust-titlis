@@ -1,3 +1,4 @@
+use tiny_skia::{FillRule, Paint, PathBuilder, Pixmap, Rect, Transform};
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
@@ -271,6 +272,11 @@ fn main() {
         .build(&event_loop)
         .unwrap();
 
+    // Prepare to use softbuffer and get surface
+    let window = std::rc::Rc::new(window);
+    let context = softbuffer::Context::new(window.clone()).unwrap();
+    let mut surface = softbuffer::Surface::new(&context, window.clone()).unwrap();
+
     let _ = event_loop.run(move |event, elwt| match event {
         Event::WindowEvent {
             event: WindowEvent::CloseRequested,
@@ -282,7 +288,49 @@ fn main() {
         Event::WindowEvent {
             window_id,
             event: WindowEvent::RedrawRequested,
-        } if window_id == window.id() => {}
+        } if window_id == window.id() => {
+            // Get current window size
+            let (width, height) = {
+                let size = window.inner_size();
+                (size.width, size.height)
+            };
+
+            // Resize surface as the window's size
+            surface
+                .resize(
+                    core::num::NonZeroU32::new(width).unwrap(),
+                    core::num::NonZeroU32::new(height).unwrap(),
+                )
+                .unwrap();
+
+            // Generate a pixel buffer to draw blocks
+            let mut pixmap = Pixmap::new(width, height).unwrap();
+            draw_block(&mut pixmap);
+
+            // Apply them to display buffer
+            let mut buffer = surface.buffer_mut().unwrap();
+            for index in 0..(width * height) as usize {
+                buffer[index] = pixmap.data()[index * 4 + 2] as u32
+                    | (pixmap.data()[index * 4 + 1] as u32) << 8
+                    | (pixmap.data()[index * 4 + 0] as u32) << 16;
+            }
+            buffer.present().unwrap();
+        }
         _ => (),
     });
+}
+
+// Write a square into a pixel map
+fn draw_block(pixmap: &mut Pixmap) {
+    let rect = Rect::from_xywh(190.0, 90.0, 20.0, 20.0).unwrap();
+    let path = PathBuilder::from_rect(rect);
+    let mut paint = Paint::default();
+    paint.set_color_rgba8(104, 102, 204, 255);
+    pixmap.fill_path(
+        &path,
+        &paint,
+        FillRule::EvenOdd,
+        Transform::identity(),
+        None,
+    );
 }
