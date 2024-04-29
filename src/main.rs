@@ -1,4 +1,6 @@
-use std::io::Read;
+use winit::event::{Event, WindowEvent};
+use winit::event_loop::{ControlFlow, EventLoop};
+use winit::window::WindowBuilder;
 
 // A size of pixel when drawing into a display
 const UNIT_SIZE: i32 = 20;
@@ -261,47 +263,26 @@ impl Game {
 }
 
 fn main() {
-    let mut block = Block::new(5, 4);
-    print(block);
+    let event_loop = EventLoop::new().unwrap();
+    event_loop.set_control_flow(ControlFlow::Poll);
 
-    loop {
-        let input = std::io::stdin()
-            .bytes()
-            .next()
-            .and_then(|result| result.ok())
-            .map(|byte| byte as char)
-            .unwrap();
-        match input {
-            'z' => {
-                block = block.left();
-            }
-            'c' => {
-                block = block.right();
-            }
-            'x' => {
-                block = block.rotate_left();
-            }
-            'q' => {
-                break;
-            }
-            _ => continue,
+    let window = WindowBuilder::new()
+        .with_inner_size(winit::dpi::LogicalSize::new(400, 200))
+        .build(&event_loop)
+        .unwrap();
+
+    let _ = event_loop.run(move |event, elwt| match event {
+        Event::WindowEvent {
+            event: WindowEvent::CloseRequested,
+            ..
+        } => elwt.exit(),
+        Event::AboutToWait => {
+            window.request_redraw();
         }
-        print(block);
-    }
-    fn print(block: Block) {
-        for y in (0..5).rev() {
-            print!("| ");
-            for x in 0..10 {
-                let mut sq = " ";
-                for i in 0..4 {
-                    let (px, py) = block.point(i);
-                    if px == x && py == y {
-                        sq = "*";
-                    };
-                }
-                print!("{}", sq);
-            }
-            println!(" |");
-        }
-    }
+        Event::WindowEvent {
+            window_id,
+            event: WindowEvent::RedrawRequested,
+        } if window_id == window.id() => {}
+        _ => (),
+    });
 }
